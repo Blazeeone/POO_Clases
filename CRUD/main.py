@@ -158,7 +158,14 @@ def update_persona():
                     print("Opción no válida.")
 
 def delete_persona():
-    pass
+    rut_busqueda = int(input("Ingresa el rut sin dígito verificador (ej: 12345678): "))
+    for persona in personas:
+        if persona.rut == persona.rut:
+            personas.remove(persona)
+            print(f"Persona con rut {rut_busqueda} eliminada exitosamente.")
+    print(f"persona con rut {rut_busqueda} no encontrada.")
+    input("Presiona Enter para continuar...")        
+            
 
 def menu():
     while True:
@@ -188,5 +195,6 @@ def menu():
         else:
             print("Opción no válida. Intente nuevamente.")
 
-print("Bienvenido al sistema CRUD de personas.")
+print(n/
+      "Bienvenido al sistema CRUD de personas.")
 menu()
