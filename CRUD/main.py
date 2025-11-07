@@ -195,6 +195,6 @@ def menu():
         else:
             print("Opción no válida. Intente nuevamente.")
 
-print(n/
-      "Bienvenido al sistema CRUD de personas.")
+print(
+      "?\nBienvenido al sistema CRUD de personas.")
 menu()
