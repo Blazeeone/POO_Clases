@@ -11,7 +11,7 @@ def get_connection():
     return oracledb.connect(iuser=username, password=password, dsn=dsn)
 
 
-def create_schrema():
+def create_mascota():
     
     tables = [
         (
