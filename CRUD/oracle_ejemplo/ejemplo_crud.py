@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 from datetime import datetime
+
 load_dotenv()
 
 username = os.getenv("ORACLE_USER")
@@ -440,8 +441,51 @@ def delete_ave(id: int):
     except oracledb.DatabaseError as error:
                 print(f"No se pudo eliminar el ave \n {error} \n {sql} \n {parametros}")
 
+def menu_personas():
+     while True:
+        print(
+            """
+                MENU: Mascotas
+            -----------------------
+            1. Insertar una mascota
+            2. Consultar todos las mascotas
+            3. Consultar Mascota por ID
+            4. Modificar una mascota
+            5. Eliminar una mascota
+            0. Volver al menu principal
+            """
+            )
+        opcion = input("Seleccione una opción: 1-4 (0 para salir): ")
+
 def main():
-    pass
+    while True:
+        print(
+            """
+            CRUD : Oracle + Python
+            -----------------------
+            1. Crear tablas
+            2. Insertar datos 
+            3. Actualizar datos 
+            4. Eliminar datos 
+            0. Salir
+            """
+            )
+        opcion = input("Seleccione una opción: 1-4 (0 para salir): ")
+
+        if opcion == "1":
+            create_all_tables()
+        elif opcion == "2":
+            pass
+        elif opcion == "3":
+            pass
+        elif opcion == "4":
+            pass
+        elif opcion == "0":
+            pass
+        else:
+            print("Opción no válida. Por favor, seleccione una opción del menú.")   
+            print("PRESIONE ENTER PARA CONTINUAR...")
+
 
 if __name__ == "__main__":
     main()
