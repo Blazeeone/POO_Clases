@@ -11,7 +11,7 @@ dsn = os.getenv("ORACLE_DSN")
 password = os.getenv("ORACLE_PASSWORD")
 
 def get_connection():
-    return oracledb.connect(iuser=username, password=password, dsn=dsn)
+    return oracledb.connect(user=username, password=password, dsn=dsn)
 
 def create_schema(query):
     try:
@@ -26,7 +26,7 @@ def create_all_tables():
     tables = [
             (
                 "CREATE TABLE MASCOTAS ("
-                "id INTEGER PRIMARTY KEY,"
+                "id INTEGER PRIMARY KEY," 
                 "nombre VARCHAR(50),"
                 "edad INTEGER,"
                 "especie VARCHAR(20),"
@@ -211,7 +211,7 @@ def create_ave(
     except oracledb.DatabaseError as error:
                 print(f"No se pudo insertar el dato \n {error} \n {sql} \n {parametros}")
 
-# UPDATE - Actualizacion de datos
+# UPDATE - Actualizacion de datos6
 def update_mascota( 
         id: int,
         nombre: Optional[str] = None, 
@@ -241,7 +241,7 @@ def update_mascota(
     if not modificaciones:
         return print("No has enviado datos por modificar")
     
-    sql = f"UPDATE MASCOTAS SET {', '.join(modificaciones)} WHERE id =: id"
+    sql = f"UPDATE MASCOTAS SET {', '.join(modificaciones)} WHERE id = :id"
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -282,7 +282,7 @@ def update_dueño(
     if not modificaciones:
         return print("No has enviado datos por modificar")
     
-    sql = f"UPDATE DUEÑOS SET {', '.join(modificaciones)} WHERE id =: id"
+    sql = f"UPDATE DUEÑOS SET {', '.join(modificaciones)} WHERE id = :id"
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -307,7 +307,7 @@ def update_perro(
     if not modificaciones:
         return print("No has enviado datos por modificar")
     
-    sql = f"UPDATE PERROS SET {', '.join(modificaciones)} WHERE id =: id"
+    sql = f"UPDATE PERROS SET {', '.join(modificaciones)} WHERE id = :id"
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -332,7 +332,7 @@ def update_gato(
     if not modificaciones:
         return print("No has enviado datos por modificar")
     
-    sql = f"UPDATE GATOS SET {', '.join(modificaciones)} WHERE id =: id"
+    sql = f"UPDATE GATOS SET {', '.join(modificaciones)} WHERE id = :id"
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -357,7 +357,7 @@ def update_ave(
     if not modificaciones:
         return print("No has enviado datos por modificar")
     
-    sql = f"UPDATE AVES SET {', '.join(modificaciones)} WHERE id =: id"
+    sql = f"UPDATE AVES SET {', '.join(modificaciones)} WHERE id = :id"
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -441,7 +441,7 @@ def delete_ave(id: int):
     except oracledb.DatabaseError as error:
                 print(f"No se pudo eliminar el ave \n {error} \n {sql} \n {parametros}")
 
-def menu_personas():
+def menu_mascotas():
      while True:
         print(
             """
@@ -481,7 +481,8 @@ def main():
         elif opcion == "4":
             pass
         elif opcion == "0":
-            pass
+            print("Saliendo del programa...")
+            break
         else:
             print("Opción no válida. Por favor, seleccione una opción del menú.")   
             print("PRESIONE ENTER PARA CONTINUAR...")
