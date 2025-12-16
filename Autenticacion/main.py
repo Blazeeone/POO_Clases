@@ -32,19 +32,26 @@ class Database:
 
 # Generar autenticacion
 class Auth:
-    @staticmethod
-    def register():
-        pass
-    @staticmethod
+    def register(db: Database, username: str, password: str):
+        salt = bcrypt.gentsalt(12)
+        hashed_password = bcrypt,hashpw(password, salt)
+        usuario = {
+            "id": 1,
+            "username": username,
+            "password": hashed_password
+        }
+        db.query{
+            "INSERT INTO USERS(id, username, password) VALUES ())"
+        }
     def login():
         pass
 
 class Finance:
-    def __init__(self, base_url):
+    def __init__(self, base_url: str = ""):
         self.base_url = base_url
     def get_uf(self, fecha: str = None):
         if not fecha:
-            year = datetiime.datetime.now().year()
+            year = datetime.datetime.now().year()
             month = datetime.datetime.now().month()
             day = datetime.datetime.now().day()
             fecha = f"{day}-{month}-{year}"
