@@ -64,7 +64,6 @@ class Auth:
         for usuario in resultado:
             password_user = usuario[2]
             return bcrypt.checkpw(password.encode('utf-8'), password_user)
-        
 
 
 """
@@ -105,9 +104,4 @@ class Finance:
 
 if __name__ == "__main__":
     indicadores = Finance()
-    indicadores.get_uf()
-    indicadores.get_ivp()
-    indicadores.get_ipc()
-    indicadores.get_utm()
-    indicadores.get_usd()
     indicadores.get_eur()
