@@ -94,7 +94,10 @@ class Finance:
     def get_ivp(self, fecha: str = None):
         self.get_indicator("ivp", fecha)
     def get_ipc(self, fecha: str = None):
-        self.get_indicator("ipc", fecha)
+        try:
+            self.get_indicator("ipc", fecha)
+        except Exception as e:
+            print(e)
     def get_utm(self, fecha: str = None):
         self.get_indicator("utm", fecha)
     def get_usd(self, fecha: str = None):
@@ -104,4 +107,12 @@ class Finance:
 
 if __name__ == "__main__":
     indicadores = Finance()
+    indicadores.get_uf()
+    indicadores.get_ivp() 
+    fecha = "01-11-2025"
+    indicadores.get_ipc(fecha)
+    indicadores.get_utm()
+    indicadores.get_usd()
     indicadores.get_eur()
+
+    
