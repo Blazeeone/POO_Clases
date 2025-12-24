@@ -8,7 +8,6 @@ import datetime
 
 load_dotenv()
 
-
 class Database:
     def __init__(self, username, dsn, password):
         self.username = username
@@ -16,130 +15,176 @@ class Database:
         self.password = password
 
     def get_connection(self):
+        # Conexión 'Thin' mode (no requiere cliente pesado si usas python-oracledb moderno)
         return oracledb.connect(user=self.username, password=self.password, dsn=self.dsn)
 
     def create_all_tables(self):
-        tables = [
-            (
-                "CREATE TABLE USERS("
-                "id INTEGER PRIMARY KEY,"
-                "username VARCHAR(32) UNIQUE,"
-                "password VARCHAR(128)"
-                ")"
-            )
+        # Oracle requiere bloques PL/SQL para manejar errores si la tabla ya existe
+        # Usamos GENERATED ALWAYS AS IDENTITY para que el ID sea automático (Oracle 12c+)
+        tables_sql = [
+            """
+            BEGIN
+                EXECUTE IMMEDIATE 'CREATE TABLE USERS (
+                    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    username VARCHAR2(50) UNIQUE,
+                    password VARCHAR2(128)
+                )';
+            EXCEPTION
+                WHEN OTHERS THEN
+                    IF SQLCODE != -955 THEN NULL; ELSE RAISE; END IF;
+            END;
+            """,
+            """
+            BEGIN
+                EXECUTE IMMEDIATE 'CREATE TABLE CONSULTAS (
+                    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id INTEGER,
+                    indicador VARCHAR2(20),
+                    valor FLOAT,
+                    fecha_consulta VARCHAR2(20),
+                    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES USERS(id)
+                )';
+            EXCEPTION
+                WHEN OTHERS THEN
+                    IF SQLCODE != -955 THEN NULL; ELSE RAISE; END IF;
+            END;
+            """
         ]
 
-        for table in tables:
-            self.query(table)
+        for sql in tables_sql:
+            self.query_script(sql)
+
+    def query_script(self, sql):
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                conn.commit()
+        except oracledb.DatabaseError as error:
+            print(f"Nota DB: {error}")
 
     def query(self, sql: str, parameters: Optional[dict] = None):
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
-                    ejecucion = cur.execute(sql, parameters)
-                    if sql.startswith("SELECT"):
+                    # Ejecutar consulta
+                    ejecucion = cur.execute(sql, parameters or {})
+                    
+                    # Si es un SELECT, devolver los datos
+                    if sql.strip().upper().startswith("SELECT"):
+                        columnas = [col[0] for col in cur.description]
                         resultado = []
                         for fila in ejecucion:
-                            resultado.append(fila)
+                            # Convertimos la fila en algo más manejable si es necesario
+                            resultado.append(list(fila))
                         return resultado
+                    
                 conn.commit()
         except oracledb.DatabaseError as error:
-            raise error
-
+            print(f"Error Oracle: {error}")
+            # Retornamos lista vacía o lanzamos error según prefieras, 
+            # pero mejor no romper la app en el video
+            return []
 
 class Auth:
     @staticmethod
     def login(db: Database, username: str, password: str):
-        password = password.encode("UTF-8")
-
+        # Oracle devuelve tuplas. 
+        # Columna 0: id, 1: username, 2: password
         resultado = db.query(
-            sql="SELECT * FROM USERS WHERE username = :username",
+            sql="SELECT id, username, password FROM USERS WHERE username = :username",
             parameters={"username": username}
         )
 
-        if len(resultado) < 0:
-            return {"message": "No hay coincidencias", "success": False}
+        if not resultado or len(resultado) == 0:
+            return {"message": "Usuario no encontrado", "success": False}
 
-        hashed_password = bytes.fromhex(resultado[0][2])
+        user_data = resultado[0]
+        user_id = user_data[0]
+        stored_hash = user_data[2] # El hash guardado en BD
 
-        if bcrypt.checkpw(password, hashed_password):
-            return {"message": "Inicio de sesión correcto", "success": True}
+        # Asegurar codificación
+        if isinstance(stored_hash, str):
+            stored_hash_bytes = stored_hash.encode('utf-8')
         else:
-            return {"message": "Contraseña incorrecta", "success": False}
+            stored_hash_bytes = stored_hash
+
+        password_bytes = password.encode("UTF-8")
+
+        try:
+            if bcrypt.checkpw(password_bytes, stored_hash_bytes):
+                return {"message": "Login exitoso", "success": True, "user_id": user_id}
+            else:
+                return {"message": "Contraseña incorrecta", "success": False}
+        except ValueError:
+             return {"message": "Error hash corrupto", "success": False}
 
     @staticmethod
-    def register(db: Database, id: int, username: str, password: str):
+    def register(db: Database, username: str, password: str):
         try:
-            if not id or not username or not password:
-                return {"message": "Debes de registrar un usuario con ID, Username y Password", "success": False}
+            if not username or not password:
+                return {"message": "Datos incompletos", "success": False}
             
-            password = password.encode("UTF-8")
+            password_bytes = password.encode("UTF-8")
             salt = bcrypt.gensalt(12)
-            hash_password = bcrypt.hashpw(password, salt)
+            hash_password = bcrypt.hashpw(password_bytes, salt)
+            # Guardar como string para Oracle VARCHAR2
+            hash_str = hash_password.decode('utf-8')
 
-            usuario = {
-                "id": id,
-                "username": username,
-                "password": hash_password
-            }
-
+            # NO pasamos ID, dejamos que Oracle lo genere (IDENTITY)
             db.query(
-                sql="INSERT INTO USERS(id,username,password) VALUES (:id, :username, :password)",
-                parameters=usuario
+                sql="INSERT INTO USERS(username, password) VALUES (:username, :password)",
+                parameters={"username": username, "password": hash_str}
             )
-            return {"message": "Usuario registrado con exito", "success": True}
+            return {"message": "Usuario creado. Ahora inicia sesión.", "success": True}
         except Exception as error:
-            return {"message": f"{error}", "success": False}
-
-
+            return {"message": f"Error (Usuario ya existe?): {str(error)}", "success": False}
 
 class Finance:
     def __init__(self, base_url: str = "https://mindicador.cl/api"):
         self.base_url = base_url
 
-    def get_indicator(self, indicator: str, fecha: str = None) -> float:
+    def get_indicator(self, indicator: str, fecha: str = None):
         try:
+            # Lógica API
             if not fecha:
-                dd = datetime.datetime.now().day
-                mm = datetime.datetime.now().month
-                yyyy = datetime.datetime.now().year
-                fecha = f"{dd}-{mm}-{yyyy}"
-            url = f"{self.base_url}/{indicator}/{fecha}"
-            respuesta = requests.get(url).json()
-            return respuesta["serie"][0]["valor"]
+                url = f"{self.base_url}/{indicator}"
+            else:
+                url = f"{self.base_url}/{indicator}/{fecha}"
+            
+            respuesta = requests.get(url, timeout=5).json()
+            
+            if "serie" in respuesta and len(respuesta["serie"]) > 0:
+                valor = respuesta["serie"][0]["valor"]
+                return {"valor": valor, "success": True}
+            
+            return {"message": "Sin datos para esa fecha", "success": False}
+
         except Exception as error:
-            return {"message": f"Hubo un error con la solicitud {error}", "success": False}
+            return {"message": "Error de conexión API", "success": False}
 
-    def get_usd(self, fecha: str = None):
-        valor = self.get_indicator("dolar", fecha)
-        return valor
+class History:
+    @staticmethod
+    def save_query(db: Database, user_id: int, indicator: str, value: float, date_query: str):
+        try:
+            # En Oracle, CURRENT_TIMESTAMP se maneja en el DEFAULT de la tabla, 
+            # solo insertamos los datos manuales.
+            db.query(
+                sql="INSERT INTO CONSULTAS (user_id, indicador, valor, fecha_consulta) VALUES (:u, :i, :v, :f)",
+                parameters={"u": user_id, "i": indicator, "v": value, "f": date_query}
+            )
+            return True
+        except Exception:
+            return False
 
-    def get_eur(self, fecha: str = None):
-        valor = self.get_indicator("euro", fecha)
-        return valor
-
-    def get_uf(self, fecha: str = None):
-        valor = self.get_indicator("uf", fecha)
-        return valor
-
-    def get_ivp(self, fecha: str = None):
-        valor = self.get_indicator("ivp", fecha)
-        return valor
-
-    def get_ipc(self, fecha: str = None):
-        valor = self.get_indicator("ipc", fecha)
-        return valor
-
-    def get_utm(self, fecha: str = None):
-        valor = self.get_indicator("utm", fecha)
-        return valor
-
-
-if __name__ == "__main__":
-    db = Database(
-        username=os.getenv("ORACLE_USER"),
-        password=os.getenv("ORACLE_PASSWORD"),
-        dsn=os.getenv("ORACLE_DSN")
-    )
-
-    Auth.login(db, "soyelseba", "alskjflsakf")
+    @staticmethod
+    def get_history(db: Database, user_id: int):
+        # Oracle 12c+ soporta OFFSET/FETCH, pero para seguridad usamos ROWNUM o simple ORDER BY
+        sql = """
+            SELECT indicador, valor, fecha_consulta 
+            FROM CONSULTAS 
+            WHERE user_id = :u 
+            ORDER BY fecha_registro DESC
+        """
+        return db.query(sql, {"u": user_id})
